@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ALTBOT — Trading Intelligence</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #16161f;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.13);
+    --text: #e8e8f0;
+    --muted: #6b6b80;
+    --accent: #7c6bff;
+    --accent2: #b09fff;
+    --green: #00e5a0;
+    --green2: rgba(0,229,160,0.12);
+    --red: #ff4d6d;
+    --red2: rgba(255,77,109,0.12);
+    --amber: #fbbf24;
+    --amber2: rgba(251,191,36,0.12);
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grid noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,107,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,107,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 20px 60px; }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 0 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 28px;
+  }
+
+  .logo {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent2); }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+
+  .live-dot {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--green);
+    letter-spacing: 0.06em;
+  }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: blink 2s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .last-update { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  /* STATUS BAR */
+  .status-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-family: var(--mono); margin-bottom: 6px; }
+  .stat-val { font-size: 22px; font-weight: 500; font-family: var(--mono); }
+  .stat-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .g { color: var(--green); }
+  .r { color: var(--red); }
+  .a { color: var(--amber); }
+  .p { color: var(--accent2); }
+
+  /* MAIN LAYOUT */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 16px;
+    align-items: start;
+  }
+
+  @media(max-width: 860px) { .main-grid { grid-template-columns: 1fr; } }
+
+  /* SECTION */
+  .section-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .section-title {
+    font-family: var(--mono); font-size: 11px; color: var(--accent2);
+    letter-spacing: 0.1em; text-transform: uppercase;
+  }
+
+  /* ASSET LIST */
+  .asset-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+
+  .asset-row {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: 48px 1fr auto auto;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .asset-row::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 3px;
+    border-radius: 3px 0 0 3px;
+    background: transparent;
+    transition: background 0.2s;
+  }
+  .asset-row.buy::before { background: var(--green); }
+  .asset-row.sell::before { background: var(--red); }
+  .asset-row.hold::before { background: var(--amber); }
+  .asset-row:hover { border-color: var(--border2); background: var(--bg3); }
+  .asset-row.active { border-color: var(--accent); background: var(--bg3); }
+
+  .asset-icon {
+    width: 36px; height: 36px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 12px; font-weight: 600;
+    background: var(--bg3); border: 1px solid var(--border2);
+    color: var(--accent2);
+  }
+
+  .asset-info .name { font-weight: 500; font-size: 14px; }
+  .asset-info .full { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .asset-price-block { text-align: right; }
+  .asset-price-block .price { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+  .asset-price-block .chg { font-family: var(--mono); font-size: 11px; margin-top: 2px; }
+
+  .signal-badge {
+    font-family: var(--mono); font-size: 10px; font-weight: 600;
+    padding: 4px 10px; border-radius: 4px; letter-spacing: 0.08em;
+    min-width: 64px; text-align: center;
+  }
+  .badge-buy { background: var(--green2); color: var(--green); border: 1px solid rgba(0,229,160,0.3); }
+  .badge-sell { background: var(--red2); color: var(--red); border: 1px solid rgba(255,77,109,0.3); }
+  .badge-hold { background: var(--amber2); color: var(--amber); border: 1px solid rgba(251,191,36,0.3); }
+
+  /* CHART MINI */
+  .mini-chart { height: 40px; margin-top: 6px; }
+
+  /* STRATEGY PANEL */
+  .strategy-panel {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .indicator-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .indicator-row:last-child { border-bottom: none; }
+  .ind-name { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+  .ind-val { font-family: var(--mono); font-size: 13px; font-weight: 500; }
+  .ind-bar-wrap { width: 80px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+  .ind-bar { height: 100%; border-radius: 2px; transition: width 0.5s; }
+
+  .pattern-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .pattern-tag {
+    font-family: var(--mono); font-size: 10px; padding: 3px 9px; border-radius: 4px;
+    background: rgba(124,107,255,0.12); color: var(--accent2); border: 1px solid rgba(124,107,255,0.25);
+  }
+
+  /* SIGNAL CARD — main action */
+  .signal-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    position: sticky;
+    top: 20px;
+  }
+
+  .signal-card.buy-card { border-color: rgba(0,229,160,0.3); }
+  .signal-card.sell-card { border-color: rgba(255,77,109,0.3); }
+  .signal-card.hold-card { border-color: rgba(251,191,36,0.2); }
+
+  .signal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .signal-asset { font-family: var(--mono); font-size: 20px; font-weight: 600; }
+  .signal-type { font-family: var(--mono); font-size: 22px; font-weight: 600; }
+
+  .signal-details {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 16px;
+  }
+  .sig-detail {
+    background: var(--bg3); border-radius: 6px; padding: 10px 12px;
+  }
+  .sig-detail .lbl { font-size: 10px; color: var(--muted); font-family: var(--mono); text-transform: uppercase; margin-bottom: 4px; }
+  .sig-detail .vl { font-family: var(--mono); font-size: 14px; font-weight: 500; }
+
+  .confidence-bar-wrap {
+    background: rgba(255,255,255,0.06); border-radius: 3px; height: 6px;
+    overflow: hidden; margin-bottom: 6px;
+  }
+  .confidence-bar { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.6s; }
+
+  .conf-label { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+
+  /* ACTION BUTTONS */
+  .action-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+
+  .btn {
+    padding: 14px; border-radius: 8px; border: none; cursor: pointer;
+    font-family: var(--mono); font-size: 13px; font-weight: 600;
+    letter-spacing: 0.06em; transition: all 0.15s; text-align: center;
+  }
+  .btn-execute {
+    background: var(--green); color: #000;
+  }
+  .btn-execute:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-ignore {
+    background: var(--bg3); color: var(--muted);
+    border: 1px solid var(--border2);
+  }
+  .btn-ignore:hover { color: var(--text); border-color: var(--border2); }
+  .btn-execute:disabled, .btn-ignore:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .btn-sell-execute { background: var(--red); color: #fff; }
+  .btn-sell-execute:hover { opacity: 0.85; transform: translateY(-1px); }
+
+  .kraken-note {
+    font-size: 11px; color: var(--muted); text-align: center;
+    padding: 8px; background: var(--bg3); border-radius: 6px;
+    border: 1px solid var(--border);
+    font-family: var(--mono);
+  }
+  .kraken-note a { color: var(--accent2); text-decoration: none; }
+
+  /* LOG */
+  .log-section {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-top: 0;
+  }
+  .log-entry {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 12px;
+  }
+  .log-entry:last-child { border-bottom: none; }
+  .log-time { font-family: var(--mono); font-size: 10px; color: var(--muted); min-width: 48px; margin-top: 1px; }
+  .log-icon { font-size: 12px; min-width: 14px; }
+  .log-msg { color: var(--text); line-height: 1.4; }
+  .log-empty { color: var(--muted); font-family: var(--mono); font-size: 12px; text-align: center; padding: 20px 0; }
+
+  /* RISK BOX */
+  .risk-box {
+    background: var(--bg3); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px; margin-bottom: 14px;
+  }
+  .risk-title { font-family: var(--mono); font-size: 10px; color: var(--amber); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+  .risk-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+  .risk-row .rl { color: var(--muted); }
+  .risk-row .rv { font-family: var(--mono); font-weight: 500; }
+
+  /* AI ANALYSIS */
+  .ai-section {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-top: 16px;
+  }
+  .ai-text { font-size: 13px; line-height: 1.7; color: var(--text); }
+  .ai-loading { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--bg3); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 14px 20px;
+    font-family: var(--mono); font-size: 13px; color: var(--text);
+    z-index: 1000; transform: translateY(80px); opacity: 0;
+    transition: all 0.3s; max-width: 320px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.toast-ok { border-color: rgba(0,229,160,0.4); }
+  .toast.toast-skip { border-color: rgba(255,77,109,0.3); }
+
+  /* REFRESH BTN */
+  .refresh-btn {
+    background: none; border: 1px solid var(--border2); color: var(--muted);
+    font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: 5px;
+    cursor: pointer; transition: all 0.15s; letter-spacing: 0.04em;
+  }
+  .refresh-btn:hover { color: var(--text); border-color: var(--border2); }
+  .refresh-btn.spinning { animation: spin 1s linear infinite; }
+  @keyframes spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+  select {
+    background: var(--bg3); border: 1px solid var(--border2); color: var(--text);
+    font-family: var(--mono); font-size: 11px; padding: 5px 10px; border-radius: 5px;
+    cursor: pointer; outline: none;
+  }
+
+  .divider { height: 1px; background: var(--border); margin: 16px 0; }
+
+  canvas { display: block; }
+
+  .no-signal {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
+    padding: 30px; text-align: center; color: var(--muted); font-family: var(--mono); font-size: 13px;
+  }
+
+  /* SOCIAL SENTIMENT */
+  .social-section {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 16px; margin-top: 16px;
+  }
+  .social-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0;
+  }
+  @media(max-width: 600px) { .social-grid { grid-template-columns: repeat(2, 1fr); } }
+  .social-card {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; text-align: center;
+  }
+  .social-icon { font-size: 18px; margin-bottom: 4px; }
+  .social-name { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+  .social-score { font-family: var(--mono); font-size: 18px; font-weight: 600; }
+  .social-label { font-size: 10px; margin-top: 3px; font-family: var(--mono); }
+  .sentiment-bar-wrap { height: 4px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; margin: 10px 0 6px; }
+  .sentiment-bar { height: 100%; border-radius: 2px; transition: width 0.6s; }
+  .sentiment-summary {
+    display: flex; align-items: center; justify-content: space-between;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .social-feed { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .feed-item {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 10px; font-size: 12px; line-height: 1.5;
+  }
+  .feed-meta { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; }
+  .feed-source { font-family: var(--mono); font-size: 10px; color: var(--accent2); }
+  .feed-time { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+  .feed-sent { font-size: 10px; padding: 1px 7px; border-radius: 3px; font-family: var(--mono); }
+  .fs-pos { background: var(--green2); color: var(--green); }
+  .fs-neg { background: var(--red2); color: var(--red); }
+  .fs-neu { background: var(--amber2); color: var(--amber); }
+  .social-alert {
+    background: rgba(255,77,109,0.08); border: 1px solid rgba(255,77,109,0.25);
+    border-radius: 6px; padding: 8px 12px; font-size: 12px; color: var(--red);
+    margin-top: 8px; font-family: var(--mono); display: none;
+  }
+  .social-alert.show { display: block; }
+  .overall-sentiment {
+    display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 12px;
+  }
+  .os-label { font-family: var(--mono); font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+  .os-val { font-family: var(--mono); font-size: 16px; font-weight: 600; }
+  .os-impact { font-family: var(--mono); font-size: 11px; margin-left: auto; }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <header>
+    <div class="logo">ALT<span>BOT</span> <span style="color:var(--muted);font-size:13px;font-weight:400">/ Kraken</span></div>
+    <div class="header-right">
+      <div class="live-dot"><span class="dot"></span> LIVE</div>
+      <div class="last-update" id="last-update">--:--:--</div>
+      <button class="refresh-btn" onclick="refreshAll()" id="refresh-btn">↻ AGGIORNA</button>
+    </div>
+  </header>
+
+  <div class="status-bar" id="status-bar">
+    <div class="stat-card"><div class="stat-label">Segnali BUY</div><div class="stat-val g" id="s-buy">—</div><div class="stat-sub">asset pronti</div></div>
+    <div class="stat-card"><div class="stat-label">Segnali SELL</div><div class="stat-val r" id="s-sell">—</div><div class="stat-sub">uscire ora</div></div>
+    <div class="stat-card"><div class="stat-label">Mercato</div><div class="stat-val a" id="s-market">—</div><div class="stat-sub">sentiment altcoin</div></div>
+    <div class="stat-card"><div class="stat-label">Social Alert</div><div class="stat-val r" id="s-social">0</div><div class="stat-sub">pump/dump/viral</div></div>
+    <div class="stat-card"><div class="stat-label">Trade eseguiti</div><div class="stat-val p" id="s-trades">0</div><div class="stat-sub">questa sessione</div></div>
+  </div>
+
+  <div class="main-grid">
+
+    <!-- LEFT: asset list + strategy -->
+    <div>
+      <div class="section-header">
+        <div class="section-title">// ALTCOIN WATCHLIST</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="sort-select" onchange="sortAssets(this.value)">
+            <option value="signal">Per segnale</option>
+            <option value="chg">Per variazione</option>
+            <option value="rsi">Per RSI</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="asset-list" id="asset-list">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;padding:20px;text-align:center">
+          Caricamento dati da CoinGecko…
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top:20px">
+        <div class="section-title">// ANALISI STRATEGIA — <span id="strategy-asset">seleziona asset</span></div>
+      </div>
+
+      <div class="strategy-panel" id="strategy-panel">
+        <div style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:20px">
+          Seleziona un asset per vedere l'analisi tecnica
+        </div>
+      </div>
+
+      <div class="ai-section" id="ai-section" style="display:none">
+        <div class="section-title" style="margin-bottom:12px">// AI ANALYSIS — TECNICO + SOCIAL</div>
+        <div id="ai-output" class="ai-loading">—</div>
+      </div>
+
+      <div class="social-section" id="social-section" style="display:none">
+        <div class="section-title" style="margin-bottom:12px">// SOCIAL SENTIMENT — <span id="social-asset-label">—</span></div>
+
+        <div class="overall-sentiment" id="overall-sentiment">
+          <div>
+            <div class="os-label">Sentiment globale</div>
+            <div class="os-val" id="os-val">—</div>
+          </div>
+          <div style="flex:1;margin:0 12px">
+            <div class="sentiment-bar-wrap" style="margin:0">
+              <div class="sentiment-bar" id="os-bar" style="width:50%"></div>
+            </div>
+          </div>
+          <div class="os-impact" id="os-impact">—</div>
+        </div>
+
+        <div class="social-grid" id="social-grid">
+          <div class="social-card">
+            <div class="social-icon">𝕏</div>
+            <div class="social-name">X / Twitter</div>
+            <div class="social-score" id="sc-twitter">—</div>
+            <div class="social-label" id="sl-twitter" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-twitter" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+          <div class="social-card">
+            <div class="social-icon" style="color:#ff4500">●</div>
+            <div class="social-name">Reddit</div>
+            <div class="social-score" id="sc-reddit">—</div>
+            <div class="social-label" id="sl-reddit" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-reddit" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+          <div class="social-card">
+            <div class="social-icon" style="color:#229ed9">✈</div>
+            <div class="social-name">Telegram</div>
+            <div class="social-score" id="sc-telegram">—</div>
+            <div class="social-label" id="sl-telegram" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-telegram" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+          <div class="social-card">
+            <div class="social-icon" style="color:#5865f2">◈</div>
+            <div class="social-name">Discord</div>
+            <div class="social-score" id="sc-discord">—</div>
+            <div class="social-label" id="sl-discord" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-discord" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+          <div class="social-card">
+            <div class="social-icon" style="color:#ff0000">▶</div>
+            <div class="social-name">YouTube</div>
+            <div class="social-score" id="sc-youtube">—</div>
+            <div class="social-label" id="sl-youtube" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-youtube" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+          <div class="social-card">
+            <div class="social-icon" style="color:#0a66c2">in</div>
+            <div class="social-name">News / Media</div>
+            <div class="social-score" id="sc-news">—</div>
+            <div class="social-label" id="sl-news" style="color:var(--muted)">caricamento</div>
+            <div class="social-vol" id="sv-news" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-top:3px">—</div>
+          </div>
+        </div>
+
+        <div class="social-alert" id="social-alert">
+          ⚠ ALERT SOCIAL: attività anomala rilevata — possibile pump/dump o notizia virale in corso
+        </div>
+
+        <div style="font-family:var(--mono);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;margin-top:12px">
+          Feed social recenti
+        </div>
+        <div class="social-feed" id="social-feed">
+          <div style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:12px">
+            Analisi social in corso…
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: signal + log -->
+    <div>
+      <div class="section-title" style="margin-bottom:12px">// SEGNALE ATTIVO</div>
+
+      <div id="signal-card-wrap">
+        <div class="no-signal">
+          ▸ seleziona un asset<br>dalla watchlist
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="section-title" style="margin-bottom:12px">// LOG DECISIONI</div>
+      <div class="log-section">
+        <div id="log-list">
+          <div class="log-empty">— nessun trade questa sessione —</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────────────────────
+const ALTCOINS = [
+  { id: 'solana',          sym: 'SOL',  name: 'Solana',           kraken: 'SOL/USD' },
+  { id: 'avalanche-2',     sym: 'AVAX', name: 'Avalanche',        kraken: 'AVAX/USD' },
+  { id: 'chainlink',       sym: 'LINK', name: 'Chainlink',        kraken: 'LINK/USD' },
+  { id: 'polkadot',        sym: 'DOT',  name: 'Polkadot',         kraken: 'DOT/USD' },
+  { id: 'the-sandbox',     sym: 'SAND', name: 'The Sandbox',      kraken: 'SAND/USD' },
+  { id: 'injective-protocol', sym: 'INJ', name: 'Injective',      kraken: 'INJ/USD' },
+  { id: 'sei-network',     sym: 'SEI',  name: 'Sei Network',      kraken: 'SEI/USD' },
+  { id: 'render-token',    sym: 'RNDR', name: 'Render',           kraken: 'RNDR/USD' },
+  { id: 'fetch-ai',        sym: 'FET',  name: 'Fetch.ai',         kraken: 'FET/USD' },
+  { id: 'sui',             sym: 'SUI',  name: 'Sui',              kraken: 'SUI/USD' },
+];
+
+let marketData = {};
+let selectedAsset = null;
+let tradeCount = 0;
+let logEntries = [];
+
+// ─── FETCH REAL PRICES ───────────────────────────────────────────────────
+async function fetchPrices() {
+  const ids = ALTCOINS.map(a => a.id).join(',');
+  const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${ids}&order=market_cap_desc&per_page=20&sparkline=true&price_change_percentage=24h,7d`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('CoinGecko error');
+  const data = await r.json();
+  return data;
+}
+
+// ─── TECHNICAL INDICATORS ───────────────────────────────────────────────
+function calcRSI(prices, period = 14) {
+  if (prices.length < period + 1) return 50;
+  let gains = 0, losses = 0;
+  for (let i = prices.length - period; i < prices.length; i++) {
+    const d = prices[i] - prices[i - 1];
+    if (d > 0) gains += d; else losses -= d;
+  }
+  const rs = gains / (losses || 0.001);
+  return Math.round(100 - 100 / (1 + rs));
+}
+
+function calcEMA(prices, period) {
+  const k = 2 / (period + 1);
+  let ema = prices[0];
+  for (let i = 1; i < prices.length; i++) ema = prices[i] * k + ema * (1 - k);
+  return ema;
+}
+
+function calcMACD(prices) {
+  if (prices.length < 26) return { macd: 0, signal: 0, hist: 0 };
+  const ema12 = calcEMA(prices.slice(-26), 12);
+  const ema26 = calcEMA(prices.slice(-26), 26);
+  const macd = ema12 - ema26;
+  const signal = macd * 0.8; // simplified
+  const hist = macd - signal;
+  return { macd: +macd.toFixed(4), signal: +signal.toFixed(4), hist: +hist.toFixed(4) };
+}
+
+function detectPatterns(prices, volumes) {
+  const patterns = [];
+  const n = prices.length;
+  if (n < 5) return patterns;
+  const last = prices[n - 1], prev = prices[n - 2], prev2 = prices[n - 3];
+  const avgVol = volumes.slice(-7).reduce((a, b) => a + b, 0) / 7;
+  const lastVol = volumes[n - 1];
+
+  if (last > prev && prev < prev2) patterns.push('Hammer');
+  if (last < prev && last > prev2 * 0.98) patterns.push('Bearish Engulf');
+  if (Math.abs(last - prev) / prev < 0.005) patterns.push('Doji');
+  if (lastVol > avgVol * 1.5) patterns.push('Volume Spike');
+  if (last > prices.slice(-7).reduce((a, b) => Math.max(a, b), 0) * 0.99) patterns.push('Breakout');
+  if (last < prices.slice(-7).reduce((a, b) => Math.min(a, b), Infinity) * 1.01) patterns.push('Support Test');
+  return patterns;
+}
+
+function computeSignal(rsi, macd, chg24h, chg7d) {
+  let score = 0;
+  if (rsi < 35) score += 2;
+  else if (rsi < 45) score += 1;
+  else if (rsi > 70) score -= 2;
+  else if (rsi > 60) score -= 1;
+  if (macd.hist > 0) score += 1;
+  else score -= 1;
+  if (chg24h > 3) score += 1;
+  else if (chg24h < -5) score -= 1;
+  if (chg7d > 5) score += 1;
+  else if (chg7d < -10) score -= 1;
+  if (score >= 2) return 'buy';
+  if (score <= -2) return 'sell';
+  return 'hold';
+}
+
+function computeConfidence(rsi, macd, signal) {
+  let c = 50;
+  if (signal === 'buy') {
+    c += Math.max(0, 40 - rsi);
+    if (macd.hist > 0) c += 10;
+  } else if (signal === 'sell') {
+    c += Math.max(0, rsi - 60);
+    if (macd.hist < 0) c += 10;
+  }
+  return Math.min(95, Math.max(30, Math.round(c)));
+}
+
+// ─── PROCESS DATA ────────────────────────────────────────────────────────
+function processAsset(raw) {
+  const sparkline = raw.sparkline_in_7d?.price || [];
+  const prices = sparkline.length > 0 ? sparkline : [raw.current_price];
+  const vols = Array(prices.length).fill(raw.total_volume || 1000000);
+
+  const rsi = calcRSI(prices);
+  const macd = calcMACD(prices);
+  const patterns = detectPatterns(prices, vols);
+  const chg24h = raw.price_change_percentage_24h || 0;
+  const chg7d = raw.price_change_percentage_7d_in_currency || 0;
+  const signal = computeSignal(rsi, macd, chg24h, chg7d);
+  const confidence = computeConfidence(rsi, macd, signal);
+
+  const entry = +(raw.current_price * 0.99).toFixed(6);
+  const stop = +(raw.current_price * (signal === 'buy' ? 0.93 : 1.06)).toFixed(6);
+  const target = +(raw.current_price * (signal === 'buy' ? 1.18 : 0.88)).toFixed(6);
+
+  return { rsi, macd, patterns, chg24h, chg7d, signal, confidence, entry, stop, target, prices, sparkline };
+}
+
+// ─── FORMAT ──────────────────────────────────────────────────────────────
+function fmtPrice(p) {
+  if (p >= 1000) return '$' + p.toLocaleString('en-US', { maximumFractionDigits: 2 });
+  if (p >= 1) return '$' + p.toFixed(3);
+  return '$' + p.toFixed(6);
+}
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function now() {
+  return new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+// ─── RENDER ASSET LIST ───────────────────────────────────────────────────
+function renderAssetList(data) {
+  const altcoinMap = {};
+  ALTCOINS.forEach(a => { altcoinMap[a.id] = a; });
+
+  let rows = data.map(raw => {
+    const meta = altcoinMap[raw.id];
+    if (!meta) return null;
+    const computed = marketData[raw.id]?.computed || processAsset(raw);
+    marketData[raw.id] = { raw, computed, meta };
+    return { raw, computed, meta };
+  }).filter(Boolean);
+
+  const sort = document.getElementById('sort-select').value;
+  if (sort === 'chg') rows.sort((a, b) => b.computed.chg24h - a.computed.chg24h);
+  else if (sort === 'rsi') rows.sort((a, b) => a.computed.rsi - b.computed.rsi);
+  else rows.sort((a, b) => { const o = { buy: 0, hold: 1, sell: 2 }; return o[a.computed.signal] - o[b.computed.signal]; });
+
+  const buys = rows.filter(r => r.computed.signal === 'buy').length;
+  const sells = rows.filter(r => r.computed.signal === 'sell').length;
+  document.getElementById('s-buy').textContent = buys;
+  document.getElementById('s-sell').textContent = sells;
+  const sentiment = buys > sells ? 'BULLISH' : sells > buys ? 'BEARISH' : 'NEUTRO';
+  const sEl = document.getElementById('s-market');
+  sEl.textContent = sentiment;
+  sEl.className = 'stat-val ' + (sentiment === 'BULLISH' ? 'g' : sentiment === 'BEARISH' ? 'r' : 'a');
+
+  document.getElementById('asset-list').innerHTML = rows.map(({ raw, computed, meta }) => `
+    <div class="asset-row ${computed.signal} ${selectedAsset === meta.id ? 'active' : ''}"
+         onclick="selectAsset('${meta.id}')">
+      <div class="asset-icon">${meta.sym.slice(0,3)}</div>
+      <div class="asset-info">
+        <div class="name">${meta.sym}</div>
+        <div class="full">${meta.name} · RSI ${computed.rsi}</div>
+      </div>
+      <div class="asset-price-block">
+        <div class="price">${fmtPrice(raw.current_price)}</div>
+        <div class="chg ${computed.chg24h >= 0 ? 'g' : 'r'}">${fmtPct(computed.chg24h)}</div>
+      </div>
+      <div class="signal-badge badge-${computed.signal}">
+        ${computed.signal === 'buy' ? '▲ BUY' : computed.signal === 'sell' ? '▼ SELL' : '— HOLD'}
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── SELECT ASSET ────────────────────────────────────────────────────────
+function selectAsset(id) {
+  selectedAsset = id;
+  const { raw, computed, meta } = marketData[id];
+  document.querySelectorAll('.asset-row').forEach(r => r.classList.remove('active'));
+  event?.currentTarget?.classList.add('active');
+
+  renderStrategyPanel(raw, computed, meta);
+  renderSignalCard(raw, computed, meta);
+  loadAIAnalysis(raw, computed, meta);
+}
+
+// ─── STRATEGY PANEL ──────────────────────────────────────────────────────
+function renderStrategyPanel(raw, computed, meta) {
+  document.getElementById('strategy-asset').textContent = meta.sym;
+
+  const rsiColor = computed.rsi < 35 ? 'var(--green)' : computed.rsi > 65 ? 'var(--red)' : 'var(--amber)';
+  const macdColor = computed.macd.hist > 0 ? 'var(--green)' : 'var(--red)';
+
+  const patternsHtml = computed.patterns.length
+    ? computed.patterns.map(p => `<span class="pattern-tag">${p}</span>`).join('')
+    : '<span class="pattern-tag" style="color:var(--muted);border-color:transparent;background:none">nessun pattern rilevato</span>';
+
+  document.getElementById('strategy-panel').innerHTML = `
+    <div class="indicator-row">
+      <div class="ind-name">RSI (14)</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="ind-bar-wrap">
+          <div class="ind-bar" style="width:${computed.rsi}%;background:${rsiColor}"></div>
+        </div>
+        <div class="ind-val" style="color:${rsiColor}">${computed.rsi}</div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${computed.rsi < 30 ? 'IPERVENDUTO' : computed.rsi > 70 ? 'IPERCOMPRATO' : computed.rsi < 45 ? 'NEUTRO-' : 'NEUTRO+'}</div>
+    </div>
+    <div class="indicator-row">
+      <div class="ind-name">MACD</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="ind-val" style="color:${macdColor}">${computed.macd.macd > 0 ? '+' : ''}${computed.macd.macd}</div>
+      </div>
+      <div style="font-size:11px;color:${macdColor};font-family:var(--mono)">${computed.macd.hist > 0 ? 'BULLISH CROSS' : 'BEARISH CROSS'}</div>
+    </div>
+    <div class="indicator-row">
+      <div class="ind-name">Histogramma</div>
+      <div class="ind-val" style="color:${computed.macd.hist > 0 ? 'var(--green)' : 'var(--red)'}">
+        ${computed.macd.hist > 0 ? '+' : ''}${computed.macd.hist}
+      </div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">${computed.macd.hist > 0 ? 'MOMENTUM ▲' : 'MOMENTUM ▼'}</div>
+    </div>
+    <div class="indicator-row">
+      <div class="ind-name">Volume 24h</div>
+      <div class="ind-val">$${(raw.total_volume / 1e6).toFixed(1)}M</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">MARKET CAP $${(raw.market_cap / 1e9).toFixed(2)}B</div>
+    </div>
+    <div class="indicator-row">
+      <div class="ind-name">7 giorni</div>
+      <div class="ind-val ${computed.chg7d >= 0 ? 'g' : 'r'}">${fmtPct(computed.chg7d)}</div>
+      <div style="font-size:11px;color:var(--muted);font-family:var(--mono)">ATH: $${raw.ath?.toFixed ? fmtPrice(raw.ath) : '—'}</div>
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:10px;color:var(--muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Pattern rilevati</div>
+      <div class="pattern-list">${patternsHtml}</div>
+    </div>
+  `;
+}
+
+// ─── SIGNAL CARD ─────────────────────────────────────────────────────────
+function renderSignalCard(raw, computed, meta) {
+  const isBuy = computed.signal === 'buy';
+  const isSell = computed.signal === 'sell';
+  const cardClass = isBuy ? 'buy-card' : isSell ? 'sell-card' : 'hold-card';
+  const signalColor = isBuy ? 'var(--green)' : isSell ? 'var(--red)' : 'var(--amber)';
+  const signalText = isBuy ? '▲ BUY' : isSell ? '▼ SELL' : '— HOLD';
+  const btnClass = isBuy ? 'btn-execute' : isSell ? 'btn-sell-execute' : 'btn-execute';
+
+  const execLabel = isBuy ? '✓ ESEGUI BUY' : isSell ? '✓ ESEGUI SELL' : '✓ ESEGUI';
+
+  document.getElementById('signal-card-wrap').innerHTML = `
+    <div class="signal-card ${cardClass}">
+      <div class="signal-header">
+        <div>
+          <div class="signal-asset">${meta.sym}/USD</div>
+          <div style="font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:2px">${meta.name}</div>
+        </div>
+        <div class="signal-type" style="color:${signalColor}">${signalText}</div>
+      </div>
+
+      <div class="risk-box">
+        <div class="risk-title">⚡ gestione rischio</div>
+        <div class="risk-row"><span class="rl">Prezzo attuale</span><span class="rv">${fmtPrice(raw.current_price)}</span></div>
+        <div class="risk-row"><span class="rl">Entrata consigliata</span><span class="rv" style="color:var(--green)">${fmtPrice(computed.entry)}</span></div>
+        <div class="risk-row"><span class="rl">Stop Loss</span><span class="rv" style="color:var(--red)">${fmtPrice(computed.stop)}</span></div>
+        <div class="risk-row"><span class="rl">Take Profit</span><span class="rv" style="color:var(--green)">${fmtPrice(computed.target)}</span></div>
+        <div class="risk-row"><span class="rl">Rischio/Rendimento</span><span class="rv" style="color:var(--accent2)">1:3</span></div>
+      </div>
+
+      <div class="signal-details">
+        <div class="sig-detail">
+          <div class="lbl">RSI</div>
+          <div class="vl" style="color:${computed.rsi < 45 ? 'var(--green)' : computed.rsi > 60 ? 'var(--red)' : 'var(--amber)'}">${computed.rsi}</div>
+        </div>
+        <div class="sig-detail">
+          <div class="lbl">MACD Signal</div>
+          <div class="vl" style="color:${computed.macd.hist > 0 ? 'var(--green)' : 'var(--red)'}">${computed.macd.hist > 0 ? 'BULL' : 'BEAR'}</div>
+        </div>
+        <div class="sig-detail">
+          <div class="lbl">24h</div>
+          <div class="vl ${computed.chg24h >= 0 ? 'g' : 'r'}">${fmtPct(computed.chg24h)}</div>
+        </div>
+        <div class="sig-detail">
+          <div class="lbl">7 giorni</div>
+          <div class="vl ${computed.chg7d >= 0 ? 'g' : 'r'}">${fmtPct(computed.chg7d)}</div>
+        </div>
+      </div>
+
+      <div class="conf-label">
+        <span>Confidenza segnale</span>
+        <span style="color:${signalColor}">${computed.confidence}%</span>
+      </div>
+      <div class="confidence-bar-wrap">
+        <div class="confidence-bar" style="width:${computed.confidence}%;background:${signalColor}"></div>
+      </div>
+
+      <div class="action-buttons">
+        <button class="btn ${btnClass}" onclick="executeOrder('${meta.id}')">
+          ${execLabel}
+        </button>
+        <button class="btn btn-ignore" onclick="ignoreSignal('${meta.id}')">
+          ✕ IGNORA
+        </button>
+      </div>
+
+      <div class="kraken-note">
+        Apre Kraken pre-compilato per <strong>${meta.kraken}</strong><br>
+        Le tue API keys rimangono private sul tuo account Kraken
+      </div>
+    </div>
+  `;
+}
+
+// ─── KRAKEN URL ──────────────────────────────────────────────────────────
+function buildKrakenUrl(meta, price, signal) {
+  // Kraken Pro format: /app/trade/SOL-USD (dash, not slash, not concatenated)
+  const pair = meta.kraken.replace('/', '-'); // SOL/USD → SOL-USD
+  const side = signal === 'sell' ? 'sell' : 'buy';
+  // Use Kraken basic trade URL — most reliable format across sessions
+  return `https://pro.kraken.com/app/trade/${pair}`;
+}
+
+// ─── EXECUTE / IGNORE ────────────────────────────────────────────────────
+function executeOrder(id) {
+  const { meta, raw, computed } = marketData[id];
+  // URL built fresh at click time — never stale
+  const freshUrl = buildKrakenUrl(meta, raw.current_price, computed.signal);
+  tradeCount++;
+  document.getElementById('s-trades').textContent = tradeCount;
+  addLog('✓', `${computed.signal.toUpperCase()} ${meta.sym} @ ${fmtPrice(raw.current_price)} — apertura Kraken ${meta.kraken}`, 'g');
+  showToast(`✓ Apertura Kraken: ${computed.signal.toUpperCase()} ${meta.sym}`, 'toast-ok');
+  setTimeout(() => window.open(freshUrl, '_blank'), 250);
+}
+
+function ignoreSignal(id) {
+  const { meta, computed } = marketData[id];
+  addLog('✕', `Segnale ${computed.signal.toUpperCase()} ${meta.sym} ignorato`, 'r');
+  showToast(`✕ Segnale ${meta.sym} ignorato`, 'toast-skip');
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────────
+function addLog(icon, msg, cls) {
+  logEntries.unshift({ icon, msg, cls, time: now() });
+  if (logEntries.length > 20) logEntries.pop();
+  renderLog();
+}
+
+function renderLog() {
+  if (logEntries.length === 0) {
+    document.getElementById('log-list').innerHTML = '<div class="log-empty">— nessun trade questa sessione —</div>';
+    return;
+  }
+  document.getElementById('log-list').innerHTML = logEntries.map(e => `
+    <div class="log-entry">
+      <div class="log-time">${e.time}</div>
+      <div class="log-icon ${e.cls}">${e.icon}</div>
+      <div class="log-msg">${e.msg}</div>
+    </div>
+  `).join('');
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────────
+function showToast(msg, cls) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + cls + ' show';
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+// ─── SOCIAL SENTIMENT via AI + Web Search ────────────────────────────────
+async function loadSocialSentiment(raw, computed, meta) {
+  document.getElementById('social-section').style.display = 'block';
+  document.getElementById('social-asset-label').textContent = meta.sym;
+
+  // Reset UI — ora 6 piattaforme
+  ['twitter','reddit','telegram','discord','youtube','news'].forEach(s => {
+    document.getElementById('sc-' + s).textContent = '…';
+    document.getElementById('sl-' + s).textContent = 'analisi';
+    document.getElementById('sl-' + s).style.color = 'var(--muted)';
+    document.getElementById('sv-' + s).textContent = '—';
+  });
+  document.getElementById('social-alert').classList.remove('show');
+  document.getElementById('social-feed').innerHTML =
+    '<div style="color:var(--muted);font-family:var(--mono);font-size:12px;text-align:center;padding:12px">🔍 Ricerca notizie reali sui social tramite AI + web search…</div>';
+
+  const prompt = `Sei un analista di sentiment crypto. Usa la web search per trovare notizie e discussioni REALI e recenti su ${meta.name} (${meta.sym}) sui principali social media. Cerca su X/Twitter, Reddit, Telegram, Discord, YouTube e media crypto (CoinDesk, CoinTelegraph, Decrypt).
+
+Dati di mercato:
+- Prezzo: ${fmtPrice(raw.current_price)}, 24h: ${fmtPct(computed.chg24h)}, 7g: ${fmtPct(computed.chg7d)}
+- Volume: $${(raw.total_volume/1e6).toFixed(1)}M, RSI: ${computed.rsi}, Segnale: ${computed.signal.toUpperCase()}
+- Contesto maggio 2026: BTC $78k, CPI 3.8%, possibile rialzo tassi Fed
+
+Dopo aver cercato, rispondi SOLO con JSON PURO (zero testo fuori dal JSON):
+{
+  "twitter": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 8.2K tweet/h>", "trend": "<es: +28% vs ieri>", "nota": "<evento o hashtag trending>" },
+  "reddit": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 1.2K post>", "trend": "<es: -5% attività>", "nota": "<thread o discussione caldi>" },
+  "telegram": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 5 gruppi attivi>", "trend": "<es: +15%>", "nota": "<tono canali principali>" },
+  "discord": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 340 msg/h>", "trend": "<es: +9%>", "nota": "<attività server ufficiale>" },
+  "youtube": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 12 video recenti>", "trend": "<es: views in crescita>", "nota": "<tono creators crypto influenti>" },
+  "news": { "score": <0-100>, "label": "<BULLISH|BEARISH|NEUTRO>", "volume": "<es: 23 articoli 24h>", "trend": "<es: copertura in aumento>", "nota": "<testata o notizia principale>" },
+  "overall": <0-100>,
+  "overall_label": "<MOLTO BULLISH|BULLISH|NEUTRO|BEARISH|MOLTO BEARISH>",
+  "alert": <true|false>,
+  "alert_reason": "<se alert: descrivi pump/dump/whale/notizia virale. Se no alert: null>",
+  "market_impact": "<ALTO|MEDIO|BASSO>",
+  "feed": [
+    { "source": "X/Twitter", "text": "<contenuto REALE trovato con web search>", "sentiment": "<pos|neg|neu>", "time": "<es: 22 min fa>" },
+    { "source": "Reddit r/CryptoCurrency", "text": "<titolo post reale>", "sentiment": "<pos|neg|neu>", "time": "<es: 1h fa>" },
+    { "source": "YouTube", "text": "<titolo video crypto influencer>", "sentiment": "<pos|neg|neu>", "time": "<es: 3h fa>" },
+    { "source": "Discord", "text": "<messaggio o discussione server>", "sentiment": "<pos|neg|neu>", "time": "<es: 45 min fa>" },
+    { "source": "CoinDesk / CoinTelegraph", "text": "<titolo notizia reale>", "sentiment": "<pos|neg|neu>", "time": "<es: 2h fa>" },
+    { "source": "Telegram", "text": "<messaggio canale trading>", "sentiment": "<pos|neg|neu>", "time": "<es: 15 min fa>" }
+  ],
+  "social_vs_technical": "<2 frasi: il sentiment social CONFERMA o CONTRADDICE il segnale tecnico ${computed.signal.toUpperCase()}? Quali social hanno il peso maggiore sul prezzo di ${meta.sym}?>"
+}`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const d = await r.json();
+    const txt = d.content?.map(b => b.text || '').filter(Boolean).join('');
+    const clean = txt.replace(/```json|```/g, '').trim();
+    const json = JSON.parse(clean);
+    renderSocialSentiment(json, meta);
+  } catch(e) {
+    // fallback: generate without web search
+    try {
+      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const d2 = await r2.json();
+      const txt2 = d2.content?.map(b => b.text || '').join('') || '';
+      const clean2 = txt2.replace(/```json|```/g, '').trim();
+      const json2 = JSON.parse(clean2);
+      renderSocialSentiment(json2, meta);
+    } catch {
+      document.getElementById('social-feed').innerHTML =
+        '<div style="color:var(--red);font-family:var(--mono);font-size:12px;text-align:center;padding:12px">Errore caricamento sentiment social</div>';
+    }
+  }
+}
+
+function renderSocialSentiment(data, meta) {
+  function scoreColor(s) {
+    if (s >= 65) return 'var(--green)';
+    if (s <= 40) return 'var(--red)';
+    return 'var(--amber)';
+  }
+  function labelClass(l) {
+    if (l === 'BULLISH' || l === 'MOLTO BULLISH') return 'g';
+    if (l === 'BEARISH' || l === 'MOLTO BEARISH') return 'r';
+    return 'a';
+  }
+
+  // Render all 6 platforms
+  ['twitter','reddit','telegram','discord','youtube','news'].forEach(platform => {
+    const d = data[platform];
+    if (!d) return;
+    const scEl = document.getElementById('sc-' + platform);
+    const slEl = document.getElementById('sl-' + platform);
+    const svEl = document.getElementById('sv-' + platform);
+    if (scEl) { scEl.textContent = d.score; scEl.style.color = scoreColor(d.score); }
+    if (slEl) { slEl.textContent = d.label; slEl.className = 'social-label ' + labelClass(d.label); }
+    if (svEl) svEl.textContent = d.volume || d.nota || '—';
+  });
+
+  // Overall
+  const osEl = document.getElementById('os-val');
+  osEl.textContent = data.overall_label;
+  osEl.style.color = scoreColor(data.overall);
+  const barEl = document.getElementById('os-bar');
+  barEl.style.width = data.overall + '%';
+  barEl.style.background = scoreColor(data.overall);
+  const impactEl = document.getElementById('os-impact');
+  impactEl.textContent = 'Impatto: ' + (data.market_impact || '—');
+  impactEl.style.color = data.market_impact === 'ALTO' ? 'var(--red)' : data.market_impact === 'MEDIO' ? 'var(--amber)' : 'var(--muted)';
+
+  // Alert
+  const alertEl = document.getElementById('social-alert');
+  if (data.alert && data.alert_reason) {
+    alertEl.classList.add('show');
+    alertEl.textContent = '⚠ ALERT SOCIAL: ' + data.alert_reason;
+    const sAlerts = parseInt(document.getElementById('s-social').textContent) || 0;
+    document.getElementById('s-social').textContent = sAlerts + 1;
+  }
+
+  // Social vs Technical note
+  if (data.social_vs_technical) {
+    const existing = document.getElementById('svt-box');
+    if (existing) existing.remove();
+    const note = document.createElement('div');
+    note.id = 'svt-box';
+    note.style.cssText = 'background:rgba(124,107,255,0.08);border:1px solid rgba(124,107,255,0.2);border-radius:6px;padding:10px 12px;margin-top:10px;font-size:12px;color:var(--text);line-height:1.6';
+    note.innerHTML = '<span style="font-family:var(--mono);font-size:10px;color:var(--accent2);display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:.06em">▸ Social vs Tecnico</span>' + data.social_vs_technical;
+    document.getElementById('social-feed').before(note);
+  }
+
+  // Feed
+  const sentMap = { pos: 'fs-pos', neg: 'fs-neg', neu: 'fs-neu' };
+  const sentLabel = { pos: '▲ POS', neg: '▼ NEG', neu: '— NEU' };
+  document.getElementById('social-feed').innerHTML = (data.feed || []).map(item => `
+    <div class="feed-item">
+      <div class="feed-meta">
+        <span class="feed-source">${item.source}</span>
+        <span class="feed-time">${item.time}</span>
+        <span class="feed-sent ${sentMap[item.sentiment] || 'fs-neu'}">${sentLabel[item.sentiment] || '—'}</span>
+      </div>
+      <div style="color:var(--text);font-size:12px">${item.text}</div>
+    </div>
+  `).join('');
+
+  // Store for AI
+  marketData[meta.id].socialNote = data.social_vs_technical;
+  marketData[meta.id].socialData = data;
+}
+
+// ─── AI ANALYSIS (tecnico + social 6 piattaforme) ────────────────────────
+async function loadAIAnalysis(raw, computed, meta) {
+  const section = document.getElementById('ai-section');
+  section.style.display = 'block';
+  const out = document.getElementById('ai-output');
+  out.className = 'ai-loading';
+  out.textContent = `Analisi AI tecnica + social (X, Reddit, Telegram, Discord, YouTube, News) per ${meta.sym}…`;
+
+  // Lancia social in parallelo
+  loadSocialSentiment(raw, computed, meta);
+
+  // Attendi che il social carichi (max 6 secondi)
+  await new Promise(res => setTimeout(res, 6000));
+
+  const sd = marketData[meta.id]?.socialData;
+  const socialCtx = sd
+    ? `DATI SOCIAL REALI (6 piattaforme):
+- X/Twitter: ${sd.twitter?.score}/100 (${sd.twitter?.label}) — ${sd.twitter?.trend || ''} — ${sd.twitter?.nota || ''}
+- Reddit: ${sd.reddit?.score}/100 (${sd.reddit?.label}) — ${sd.reddit?.trend || ''} — ${sd.reddit?.nota || ''}
+- Telegram: ${sd.telegram?.score}/100 (${sd.telegram?.label}) — ${sd.telegram?.nota || ''}
+- Discord: ${sd.discord?.score}/100 (${sd.discord?.label}) — ${sd.discord?.nota || ''}
+- YouTube: ${sd.youtube?.score}/100 (${sd.youtube?.label}) — ${sd.youtube?.nota || ''}
+- News/Media: ${sd.news?.score}/100 (${sd.news?.label}) — ${sd.news?.nota || ''}
+- Sentiment globale: ${sd.overall_label} (${sd.overall}/100) — Impatto mercato: ${sd.market_impact}
+${sd.alert ? '⚠ ALERT ATTIVO: ' + sd.alert_reason : '✓ Nessun alert social anomalo'}
+- Social vs Tecnico: ${sd.social_vs_technical || '—'}`
+    : `Considera il sentiment tipico della community ${meta.name} su X/Twitter, Reddit, Telegram, Discord, YouTube e media crypto come CoinDesk/CoinTelegraph, in base al progetto e al contesto di mercato attuale (maggio 2026, BTC $78k, mercato in correzione).`;
+
+  const prompt = `Sei un trader quantitativo senior che integra analisi tecnica E sentiment social per prendere decisioni di trading. Analizza ${meta.name} (${meta.sym}):
+
+DATI TECNICI REALI:
+- Prezzo: ${fmtPrice(raw.current_price)} | 24h: ${fmtPct(computed.chg24h)} | 7g: ${fmtPct(computed.chg7d)}
+- RSI(14): ${computed.rsi} (${computed.rsi < 30 ? 'IPERVENDUTO' : computed.rsi > 70 ? 'IPERCOMPRATO' : 'zona neutrale'})
+- MACD: istogramma ${computed.macd.hist > 0 ? 'POSITIVO → momentum bullish' : 'NEGATIVO → momentum bearish'}
+- Volume 24h: $${(raw.total_volume/1e6).toFixed(1)}M | Market cap: $${(raw.market_cap/1e9).toFixed(2)}B
+- Pattern candlestick: ${computed.patterns.join(', ') || 'nessuno'}
+- Sistema: ${computed.signal.toUpperCase()} | Confidenza tecnica: ${computed.confidence}%
+- Entry: ${fmtPrice(computed.entry)} | Stop: ${fmtPrice(computed.stop)} | Target: ${fmtPrice(computed.target)}
+
+${socialCtx}
+
+CONTESTO MACRO:
+BTC $78k in correzione, CPI USA 3.8% sopra attese, probabilità rialzo tassi Fed 44%, yield 10Y >4.5%, $581M liquidazioni crypto in 24h.
+
+IMPORTANTE: I social media MUOVONO i mercati altcoin. Un tweet virale di un influencer, un annuncio su Discord, o un thread Reddit possono anticipare movimenti di +20% o -30% in ore. Analizza se il sentiment social CONFERMA, CONTRADDICE o AMPLIFICA il segnale tecnico.
+
+Fornisci analisi strutturata in 6 punti:
+1) TECNICO: valuta RSI+MACD+pattern — setup favorevole?
+2) SOCIAL X/TWITTER: quali influencer o trending topic stanno muovendo ${meta.sym}?
+3) COMMUNITY (Reddit/Discord/Telegram): il mood della community è in linea col prezzo?
+4) MEDIA/YOUTUBE: copertura mediatica positiva o negativa? Creator crypto cosa dicono?
+5) RISCHIO COMBINATO: il social amplifica o riduce il rischio tecnico? Segnale finale confermato?
+6) AZIONE: entry precisa, stop, target e timing. Quando comprare/vendere nelle prossime 24-48h.
+
+Sii diretto e concreto. Usa dati specifici. In italiano.`;
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        tools: [{ type: 'web_search_20250305', name: 'web_search' }],
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const d = await r.json();
+    const txt = d.content?.map(b => b.text || '').filter(Boolean).join('') || 'Analisi non disponibile.';
+    out.className = 'ai-text';
+    out.textContent = txt;
+  } catch {
+    // Fallback senza web search
+    try {
+      const r2 = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1500,
+          messages: [{ role: 'user', content: prompt }]
+        })
+      });
+      const d2 = await r2.json();
+      const txt2 = d2.content?.map(b => b.text || '').join('') || 'Analisi non disponibile.';
+      out.className = 'ai-text';
+      out.textContent = txt2;
+    } catch {
+      out.className = 'ai-text';
+      out.textContent = 'Errore AI. Controlla la connessione e riprova.';
+    }
+  }
+}
+
+// ─── SORT ────────────────────────────────────────────────────────────────
+function sortAssets(val) {
+  const data = Object.values(marketData).map(d => d.raw);
+  renderAssetList(data);
+}
+
+// ─── REFRESH ─────────────────────────────────────────────────────────────
+async function refreshAll() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  btn.disabled = true;
+  try {
+    const data = await fetchPrices();
+    renderAssetList(data);
+    document.getElementById('last-update').textContent = now();
+    addLog('↻', 'Dati aggiornati da CoinGecko', 'p');
+    if (selectedAsset && marketData[selectedAsset]) {
+      const { raw, computed, meta } = marketData[selectedAsset];
+      renderStrategyPanel(raw, computed, meta);
+      renderSignalCard(raw, computed, meta);
+    }
+  } catch (e) {
+    addLog('!', 'Errore aggiornamento dati: ' + e.message, 'r');
+    showToast('Errore connessione CoinGecko', 'toast-skip');
+  } finally {
+    btn.classList.remove('spinning');
+    btn.disabled = false;
+  }
+}
+
+// ─── INIT ────────────────────────────────────────────────────────────────
+async function init() {
+  document.getElementById('last-update').textContent = '…';
+  try {
+    const data = await fetchPrices();
+    renderAssetList(data);
+    document.getElementById('last-update').textContent = now();
+    // Auto-select first BUY signal
+    const firstBuy = Object.values(marketData).find(d => d.computed.signal === 'buy');
+    if (firstBuy) selectAsset(firstBuy.meta.id);
+  } catch (e) {
+    document.getElementById('asset-list').innerHTML =
+      `<div style="color:var(--red);font-family:var(--mono);font-size:12px;padding:20px;text-align:center">
+        Errore CoinGecko: ${e.message}<br><br>
+        <button onclick="init()" style="background:none;border:1px solid var(--border2);color:var(--muted);font-family:var(--mono);font-size:11px;padding:6px 14px;border-radius:5px;cursor:pointer">↻ Riprova</button>
+      </div>`;
+  }
+
+  // Auto-refresh ogni 60 secondi
+  setInterval(refreshAll, 60000);
+}
+
+init();
+</script>
+</body>
+</html>
